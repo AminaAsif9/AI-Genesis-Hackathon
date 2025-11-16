@@ -1,4 +1,8 @@
-streamlit
-openai
+flask
+flask-cors
 PyPDF2
-python-docx
+openai
+qdrant-client
+python-dotenv
+streamlit
+groq
