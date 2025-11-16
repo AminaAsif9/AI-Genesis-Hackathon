@@ -18,10 +18,10 @@ const Login = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const session = false;
-    if (session) {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
       navigate("/dashboard");
-      }
+    }
   }, [navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -29,6 +29,16 @@ const Login = () => {
     setLoading(true);
 
     try {
+      const storedUser = localStorage.getItem('user');
+      
+      if (!storedUser) {
+        throw new Error("No account found. Please sign up first.");
+      }
+      const user = JSON.parse(storedUser);
+      
+      if (user.email !== email) {
+        throw new Error("Invalid email or password.");
+      }
       toast({
         title: "Welcome back!",
         description: "You've successfully signed in.",

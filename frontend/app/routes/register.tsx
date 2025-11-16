@@ -19,10 +19,10 @@ export default function Auth() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const session = false;
-    if (session) {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
       navigate("/dashboard");
-      }
+    }
   }, [navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -30,15 +30,32 @@ export default function Auth() {
     setLoading(true);
 
     try {
-        toast({
-          title: "Account created!",
-          description: "You can now start using VoiceMock.",
-        });
-        navigate("/dashboard");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const user = {
+        name: fullName,
+        email,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString()
+      };
+
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      toast({
+        title: "Account created!",
+        description: "You can now start using VoiceMock.",
+      });
+
+      toast({
+        title: "Welcome back!",
+        description: "You've successfully signed in.",
+      });
+
+      navigate("/dashboard");
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Something went wrong."
       });
     } finally {
       setLoading(false);
@@ -65,6 +82,7 @@ export default function Auth() {
 
         <GlassCard>
           <form onSubmit={handleAuth} className="space-y-6">
+            
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
               <Input

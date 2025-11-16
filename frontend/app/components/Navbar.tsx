@@ -15,7 +15,15 @@ export function Navbar() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    
+    const getUser = () => {
+      const storedUser = localStorage.getItem('user');
+      
+      if (!storedUser) {
+        throw new Error("No account found. Please sign up first.");
+      }
+      setUser(storedUser);
+    }
+    getUser();
   }, []);
 
   const handleSignOut = async () => {
@@ -65,10 +73,10 @@ export function Navbar() {
           ) : (
             <>
               <Button variant="ghost" asChild>
-                <Link to="/auth">Sign In</Link>
+                <Link to="/auth/login">Sign In</Link>
               </Button>
               <Button asChild className="bg-linear-to-r from-accent to-primary hover:from-accent/90 hover:to-primary/90 rounded-xl">
-                <Link to="/auth?mode=signup">Get Started</Link>
+                <Link to="/auth/register">Get Started</Link>
               </Button>
             </>
           )}

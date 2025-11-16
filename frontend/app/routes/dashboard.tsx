@@ -7,10 +7,23 @@ import { GradientButton } from "~/components/GradientButton";
 import { Upload, PlayCircle, History, TrendingUp } from "lucide-react";
 import { Skeleton } from "~/components/ui/skeleton";
 
-const DAshboard = () => {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [interviews, setInterviews] = useState<any[]>([]);
+interface User {
+  name: string;
+  email: string;
+  id: string;
+  createdAt: string;
+}
+
+interface Interview {
+  id: string;
+  job_title: string;
+  created_at: string;
+  status: string;
+}
+
+const Dashboard = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [interviews, setInterviews] = useState<Interview[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -18,13 +31,37 @@ const DAshboard = () => {
     const checkAuth = async () => {
       setLoading(true);
 
-      const loggedIn = true;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      if (loggedIn) {
-        setUser(null);
+      const storedUser = localStorage.getItem('user');
+
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        
+        // Mock interview data
+        const mockInterviews: Interview[] = [
+          {
+            id: '1',
+            job_title: 'Senior Software Engineer',
+            created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+            status: 'Completed'
+          },
+          {
+            id: '2',
+            job_title: 'Product Manager',
+            created_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
+            status: 'Completed'
+          }
+        ];
+        
+        setInterviews(mockInterviews);
       } else {
-        navigate('/auth/login')
+        navigate('/auth');
       }
+
+      setLoading(false);
     };
 
     checkAuth();
@@ -72,6 +109,8 @@ const DAshboard = () => {
     );
   }
 
+  const firstName = user?.name?.split(' ')[0] || 'there';
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -81,7 +120,7 @@ const DAshboard = () => {
           {/* Welcome Banner */}
           <div className="mb-12">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Welcome back, {profile?.full_name?.split(' ')[0] || 'there'}! 👋
+              Welcome back, {firstName}! 👋
             </h1>
             <p className="text-xl text-muted-foreground">
               Ready to practice your interview skills?
@@ -95,7 +134,7 @@ const DAshboard = () => {
                 <div className="flex flex-col h-full">
                   <action.icon className="h-12 w-12 text-accent mb-4" />
                   <h3 className="text-2xl font-semibold mb-2">{action.title}</h3>
-                  <p className="text-muted-foreground mb-6 grow">
+                  <p className="text-muted-foreground mb-6 flex-grow">
                     {action.description}
                   </p>
                   <GradientButton
@@ -153,7 +192,7 @@ const DAshboard = () => {
           <GlassCard>
             <div className="text-center py-12">
               <TrendingUp className="h-16 w-16 text-accent mx-auto mb-4" />
-              <h3 className="text-2xl font-semibold mb-2">
+              <h3 className="text-2xl font-semold mb-2">
                 Track Your Progress
               </h3>
               <p className="text-muted-foreground">
@@ -169,4 +208,4 @@ const DAshboard = () => {
   );
 }
 
-export default DAshboard;
+export default Dashboard;
