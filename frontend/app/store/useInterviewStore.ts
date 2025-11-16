@@ -7,6 +7,7 @@ interface InterviewState {
   jobDescription: string;
   seniorityLevel: string;
   difficultyLevel: string;
+  questions: string[];
   conversation: Array<{ role: string; content: string }>;
   currentQuestion: string;
   interviewActive: boolean;
@@ -17,6 +18,7 @@ interface InterviewState {
   setJobDescription: (description: string) => void;
   setSeniorityLevel: (level: string) => void;
   setDifficultyLevel: (level: string) => void;
+  setQuestions: (questions: string[]) => void;
   addMessage: (message: { role: string; content: string }) => void;
   setCurrentQuestion: (question: string) => void;
   setInterviewActive: (active: boolean) => void;
@@ -31,6 +33,7 @@ export const useInterviewStore = create<InterviewState>((set) => ({
   jobDescription: '',
   seniorityLevel: 'mid',
   difficultyLevel: 'medium',
+  questions: [],
   conversation: [],
   currentQuestion: '',
   interviewActive: false,
@@ -41,6 +44,7 @@ export const useInterviewStore = create<InterviewState>((set) => ({
   setJobDescription: (description) => set({ jobDescription: description }),
   setSeniorityLevel: (level) => set({ seniorityLevel: level }),
   setDifficultyLevel: (level) => set({ difficultyLevel: level }),
+  setQuestions: (questions) => set({ questions }),
   addMessage: (message) => set((state) => ({ conversation: [...state.conversation, message] })),
   setCurrentQuestion: (question) => set({ currentQuestion: question }),
   setInterviewActive: (active) => set({ interviewActive: active }),
@@ -50,5 +54,6 @@ export const useInterviewStore = create<InterviewState>((set) => ({
     currentQuestion: '',
     interviewActive: false,
     interviewId: null,
+    questions: [],
   }),
 }));

@@ -40,25 +40,19 @@ const Dashboard = () => {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
         
-        // Mock interview data
+        // Mock interview data - single demo entry
         const mockInterviews: Interview[] = [
           {
             id: '1',
-            job_title: 'Senior Software Engineer',
+            job_title: 'Senior Software Engineer [Demo Result]',
             created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-            status: 'Completed'
-          },
-          {
-            id: '2',
-            job_title: 'Product Manager',
-            created_at: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
             status: 'Completed'
           }
         ];
         
         setInterviews(mockInterviews);
       } else {
-        navigate('/auth');
+        navigate('/auth/login');
       }
 
       setLoading(false);
@@ -86,7 +80,7 @@ const Dashboard = () => {
       title: "View History",
       description: "Review your past interview sessions",
       icon: History,
-      path: "#history",
+      path: "history",
       gradient: "secondary" as const,
     },
   ];
@@ -139,7 +133,15 @@ const Dashboard = () => {
                   </p>
                   <GradientButton
                     gradient={action.gradient}
-                    onClick={() => navigate(action.path)}
+                    onClick={() => {
+                      if (action.path.startsWith('#') || action.path === 'history') {
+                        // Scroll to history section
+                        const historySection = document.querySelector('[data-history-section]');
+                        historySection?.scrollIntoView({ behavior: 'smooth' });
+                      } else {
+                        navigate(action.path);
+                      }
+                    }}
                     className="w-full"
                   >
                     Get Started
@@ -150,8 +152,13 @@ const Dashboard = () => {
           </div>
 
           {/* Recent Interviews */}
-          <div className="mb-12">
-            <h2 className="text-3xl font-bold mb-6">Recent Interviews</h2>
+          <div className="mb-12" data-history-section>
+            <div className="flex items-center gap-4 mb-6">
+              <h2 className="text-3xl font-bold">Recent Interviews</h2>
+              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                Demo Data
+              </span>
+            </div>
             {interviews.length > 0 ? (
               <div className="space-y-4">
                 {interviews.map((interview) => (
@@ -168,7 +175,7 @@ const Dashboard = () => {
                       </div>
                       <GradientButton
                         gradient="primary"
-                        onClick={() => navigate(`/interview/results/${interview.id}`)}
+                        onClick={() => navigate(`/interview/result/${interview.id}`)}
                       >
                         View Results
                       </GradientButton>

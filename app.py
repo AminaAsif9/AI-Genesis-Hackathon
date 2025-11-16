@@ -9,6 +9,10 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from groq import Groq
 import io
+import jwt
+import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 
 app = Flask(__name__)
 CORS(app)
@@ -26,6 +30,148 @@ qdrant_client = QdrantClient(
 
 COLLECTION_NAME = "resumes"
 VECTOR_SIZE = 384
+
+# Authentication configuration
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+users_db = {}  # In production, use a proper database
+
+# JWT token required decorator
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization')
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 401
+        try:
+            if token.startswith('Bearer '):
+                token = token.split(' ')[1]
+            data = jwt.decode(token, JWT_SECRET_KEY, algorithms=["HS256"])
+            current_user = users_db.get(data['user_id'])
+            if not current_user:
+                return jsonify({'message': 'User not found!'}), 401
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Token has expired!'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'message': 'Token is invalid!'}), 401
+        return f(current_user, *args, **kwargs)
+    return decorated
+
+# Authentication endpoints
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    try:
+        data = request.get_json()
+        
+        if not data or not data.get('email') or not data.get('password') or not data.get('name'):
+            return jsonify({'message': 'Missing required fields'}), 400
+        
+        email = data['email'].lower().strip()
+        password = data['password']
+        name = data['name'].strip()
+        confirm_password = data.get('confirmPassword')
+        
+        # Validate email format
+        if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return jsonify({'message': 'Invalid email format'}), 400
+        
+        # Check password strength
+        if len(password) < 6:
+            return jsonify({'message': 'Password must be at least 6 characters long'}), 400
+        
+        # Check if passwords match
+        if password != confirm_password:
+            return jsonify({'message': 'Passwords do not match'}), 400
+        
+        # Check if user already exists
+        if any(user['email'] == email for user in users_db.values()):
+            return jsonify({'message': 'User already exists'}), 409
+        
+        # Create new user
+        user_id = str(uuid.uuid4())
+        hashed_password = generate_password_hash(password)
+        
+        users_db[user_id] = {
+            'id': user_id,
+            'name': name,
+            'email': email,
+            'password': hashed_password,
+            'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }
+        
+        # Generate JWT token
+        token = jwt.encode({
+            'user_id': user_id,
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=7)
+        }, JWT_SECRET_KEY, algorithm="HS256")
+        
+        return jsonify({
+            'message': 'User registered successfully',
+            'token': token,
+            'user': {
+                'id': user_id,
+                'name': name,
+                'email': email,
+                'createdAt': users_db[user_id]['created_at']
+            }
+        }), 201
+        
+    except Exception as e:
+        return jsonify({'message': 'Registration failed', 'error': str(e)}), 500
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    try:
+        data = request.get_json()
+        
+        if not data or not data.get('email') or not data.get('password'):
+            return jsonify({'message': 'Missing email or password'}), 400
+        
+        email = data['email'].lower().strip()
+        password = data['password']
+        
+        # Find user by email
+        user = None
+        user_id = None
+        for uid, user_data in users_db.items():
+            if user_data['email'] == email:
+                user = user_data
+                user_id = uid
+                break
+        
+        if not user or not check_password_hash(user['password'], password):
+            return jsonify({'message': 'Invalid email or password'}), 401
+        
+        # Generate JWT token
+        token = jwt.encode({
+            'user_id': user_id,
+            'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=7)
+        }, JWT_SECRET_KEY, algorithm="HS256")
+        
+        return jsonify({
+            'message': 'Login successful',
+            'token': token,
+            'user': {
+                'id': user_id,
+                'name': user['name'],
+                'email': user['email'],
+                'createdAt': user['created_at']
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'message': 'Login failed', 'error': str(e)}), 500
+
+@app.route('/api/auth/me', methods=['GET'])
+@token_required
+def get_current_user(current_user):
+    return jsonify({
+        'user': {
+            'id': current_user['id'],
+            'name': current_user['name'],
+            'email': current_user['email'],
+            'createdAt': current_user['created_at']
+        }
+    }), 200
 
 def initialize_qdrant():
     try:

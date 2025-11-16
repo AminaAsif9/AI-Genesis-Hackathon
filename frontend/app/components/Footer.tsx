@@ -10,7 +10,7 @@ export const Footer = () => {
             <Link to="/" className="flex items-center gap-2 text-xl font-bold mb-4">
               <Mic className="h-5 w-5 text-accent" />
               <span className="bg-linear-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                VoiceMock
+                InterviewMind
               </span>
             </Link>
             <p className="text-muted-foreground text-sm">
@@ -38,7 +38,7 @@ export const Footer = () => {
         </div>
 
         <div className="border-t border-glass-border/50 mt-8 pt-8 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} VoiceMock. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} InterviewMind. All rights reserved.</p>
         </div>
       </div>
     </footer>

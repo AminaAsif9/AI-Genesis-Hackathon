@@ -7,6 +7,7 @@ import { GlassCard } from "~/components/GlassCard";
 import { useToast } from "~/hooks/use-toast";
 import { Loader2, Mic } from "lucide-react";
 import { Link } from "react-router-dom";
+import { apiClient } from "~/lib/api";
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
@@ -14,6 +15,7 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -29,33 +31,59 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
 
+    // Basic validation
+    if (!fullName || !email || !password || !confirmPassword) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all fields.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Validation Error",
+        description: "Password must be at least 6 characters long.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        title: "Validation Error",
+        description: "Passwords do not match.",
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const data = await apiClient.register(fullName, email, password, confirmPassword);
 
-      const user = {
-        name: fullName,
-        email,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString()
-      };
+      // Store token and user data
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
 
-      localStorage.setItem('user', JSON.stringify(user));
-      
       toast({
         title: "Account created!",
-        description: "You can now start using VoiceMock.",
+        description: "Welcome to InterviewMind! You can now start practicing.",
       });
-
-      toast({
-        title: "Welcome back!",
-        description: "You've successfully signed in.",
-      });
-
       navigate("/dashboard");
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Something went wrong."
+        title: "Registration Failed",
+        description: error.message || "Something went wrong. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -69,7 +97,7 @@ export default function Auth() {
           <Link to="/" className="inline-flex items-center gap-2 text-3xl font-bold mb-4">
             <Mic className="h-8 w-8 text-accent" />
             <span className="bg-linear-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              VoiceMock
+              InterviewMind
             </span>
           </Link>
           <h1 className="text-3xl font-bold mb-2">
@@ -119,6 +147,21 @@ export default function Auth() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                minLength={6}
+                className="bg-background/50 border-border"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 disabled={loading}
                 minLength={6}

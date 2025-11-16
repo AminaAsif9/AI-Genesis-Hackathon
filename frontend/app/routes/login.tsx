@@ -7,6 +7,7 @@ import { GlassCard } from "~/components/GlassCard";
 import { useToast } from "~/hooks/use-toast";
 import { Loader2, Mic } from "lucide-react";
 import { Link } from "react-router-dom";
+import { apiClient } from "~/lib/api";
 
 const Login = () => {
   const [searchParams] = useSearchParams();
@@ -28,17 +29,31 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
 
+    if (!email || !password) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all fields.",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address.",
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
-      const storedUser = localStorage.getItem('user');
-      
-      if (!storedUser) {
-        throw new Error("No account found. Please sign up first.");
-      }
-      const user = JSON.parse(storedUser);
-      
-      if (user.email !== email) {
-        throw new Error("Invalid email or password.");
-      }
+      const data = await apiClient.login(email, password);
+
+      // Store token and user data
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
       toast({
         title: "Welcome back!",
         description: "You've successfully signed in.",
@@ -46,8 +61,8 @@ const Login = () => {
       navigate("/dashboard");
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Login Failed",
+        description: error.message || "Something went wrong. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -61,7 +76,7 @@ const Login = () => {
           <Link to="/" className="inline-flex items-center gap-2 text-3xl font-bold mb-4">
             <Mic className="h-8 w-8 text-accent" />
             <span className="bg-linear-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-              VoiceMock
+              InterviewMind
             </span>
           </Link>
           <h1 className="text-3xl font-bold mb-2">

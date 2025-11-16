@@ -7,9 +7,13 @@ import { Upload, FileText, CheckCircle, Loader2 } from "lucide-react";
 import { useToast } from "~/hooks/use-toast";
 import { Progress } from "~/components/ui/progress";
 import { useInterviewStore } from "~/store/useInterviewStore";
+import { apiClient } from "~/lib/api";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 
 export default function Resume() {
   const [user, setUser] = useState<any>(null);
+  const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -22,7 +26,7 @@ export default function Resume() {
     const checkAuth = async () => {
       const session = true;
       if (!session) {
-        navigate("/auth");
+        navigate("/auth/login");
         return;
       }
       //setUser(session.user);
@@ -46,21 +50,29 @@ export default function Resume() {
   };
 
   const handleUpload = async () => {
-    if (!file || !user) return;
+    if (!file || !name.trim()) {
+      toast({
+        title: "Missing information",
+        description: "Please enter your name and select a file",
+      });
+      return;
+    }
 
     setUploading(true);
     setUploadProgress(10);
 
     try {
-      // Upload to storage
+      setUploadProgress(50);
+      const response = await apiClient.uploadResume(name.trim(), file);
       setUploadProgress(100);
-      setSummary("Resume successfully uploaded! You can now start practicing interviews.");
-      setResumeId('1');
+
+      setSummary(`Resume successfully uploaded! ${response.chunks_stored} chunks stored. You can now start practicing interviews.`);
+      setResumeId(name.trim());
       setResumeUploaded(true);
 
       toast({
         title: "Success!",
-        description: "Your resume has been uploaded successfully.",
+        description: "Your resume has been uploaded and processed successfully.",
       });
 
       setTimeout(() => {
@@ -80,7 +92,7 @@ export default function Resume() {
   return (
     <div className="min-h-screen">
       <div className="pt-24 pb-12 px-4">
-        <div className="container mx-auto max-w-3xl">
+        <div className="container mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 text-center">
             Upload Your Résumé
           </h1>
@@ -89,6 +101,19 @@ export default function Resume() {
           </p>
 
           <GlassCard>
+            <div className="space-y-6 mb-8">
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name *</Label>
+                <Input
+                  id="name"
+                  placeholder="Enter your full name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="bg-background/50 border-border"
+                />
+              </div>
+            </div>
+
             {!file ? (
               <div className="border-2 border-dashed border-border rounded-2xl p-12 text-center">
                 <Upload className="h-16 w-16 text-muted-foreground mx-auto mb-4" />

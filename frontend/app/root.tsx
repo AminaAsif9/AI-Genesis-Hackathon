@@ -10,6 +10,9 @@ import {
 import type { Route } from "./+types/root";
 import "./app.css";
 import { Navbar } from "./components/Navbar";
+import { ErrorBoundary as CustomErrorBoundary } from "./components/ErrorBoundary";
+import { ThemeProvider } from "./components/ThemeProvider";
+import { Toaster } from "./components/ui/sonner";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -34,8 +37,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        <Navbar />
-        {children}
+        <ThemeProvider defaultTheme="dark" storageKey="interview-mind-theme">
+          <CustomErrorBoundary>
+            <Navbar />
+            {children}
+            <Toaster />
+          </CustomErrorBoundary>
+        </ThemeProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

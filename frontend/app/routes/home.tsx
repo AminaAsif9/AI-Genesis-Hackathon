@@ -62,12 +62,12 @@ const Home = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <GradientButton size="lg" gradient="accent" asChild>
-                <Link to="/auth?mode=signup">
+                <Link to="/auth/register">
                   Start for Free
                 </Link>
               </GradientButton>
               <GradientButton size="lg" gradient="primary" asChild>
-                <Link to="/auth">
+                <Link to="/auth/login">
                   Sign In
                 </Link>
               </GradientButton>
@@ -135,7 +135,7 @@ const Home = () => {
               Join thousands of professionals who have improved their interview performance
             </p>
             <GradientButton size="lg" gradient="accent" asChild>
-              <Link to="/auth?mode=signup">
+              <Link to="/auth/register">
                 Get Started Now
               </Link>
             </GradientButton>

@@ -3,6 +3,6 @@ flask-cors
 PyPDF2
 openai
 qdrant-client
-python-dotenv
-streamlit
 groq
+PyJWT
+Werkzeug

@@ -7,6 +7,8 @@ import { LoadingDots } from "~/components/LoadingDots";
 import { Mic, MicOff, PhoneOff } from "lucide-react";
 import { useToast } from "~/hooks/use-toast";
 import { Button } from "~/components/ui/button";
+import { Progress } from "~/components/ui/progress";
+import { useInterviewStore } from "~/store/useInterviewStore";
 
 export default function InterviewLive() {
   const { id } = useParams();
@@ -15,20 +17,67 @@ export default function InterviewLive() {
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState("");
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const [conversation, setConversation] = useState<Array<{ role: string; content: string }>>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { questions, jobTitle } = useInterviewStore();
 
   useEffect(() => {
     const checkAuth = async () => {
     const session = true;
       if (!session) {
-        navigate("/auth");
+        navigate("/auth/login");
         return;
       }
     };
     checkAuth();
   }, [id, navigate]);
+
+  useEffect(() => {
+    if (questions.length > 0 && !currentQuestion) {
+      setCurrentQuestion(questions[0]);
+      setCurrentQuestionIndex(0);
+      setStartTime(new Date());
+    }
+  }, [questions, currentQuestion]);
+
+  // Timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (startTime) {
+      interval = setInterval(() => {
+        setElapsedTime(Math.floor((new Date().getTime() - startTime.getTime()) / 1000));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [startTime]);
+
+  const goToNextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      const nextIndex = currentQuestionIndex + 1;
+      setCurrentQuestion(questions[nextIndex]);
+      setCurrentQuestionIndex(nextIndex);
+      toast({
+        title: "Next Question",
+        description: `Question ${nextIndex + 1} of ${questions.length}`,
+      });
+    }
+  };
+
+  const goToPreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      const prevIndex = currentQuestionIndex - 1;
+      setCurrentQuestion(questions[prevIndex]);
+      setCurrentQuestionIndex(prevIndex);
+      toast({
+        title: "Previous Question",
+        description: `Question ${prevIndex + 1} of ${questions.length}`,
+      });
+    }
+  };
 
   const toggleRecording = () => {
     setIsRecording(!isRecording);
@@ -37,25 +86,46 @@ export default function InterviewLive() {
         title: "Recording started",
         description: "Speak your answer clearly",
       });
+    } else {
+      toast({
+        title: "Recording stopped",
+        description: "Processing your answer...",
+      });
+      // Simulate processing delay
+      setTimeout(() => {
+        toast({
+          title: "Answer recorded",
+          description: "AI analysis coming soon!",
+        });
+      }, 1000);
     }
   };
 
   const handleEndInterview = async () => {
-    if (!interview) return;
-
     try {
-      
-
       toast({
-        title: "Interview ended",
-        description: "Generating your results...",
+        title: "Interview Completed",
+        description: "Generating your personalized results with AI analysis...",
+        duration: 3000,
       });
 
-      navigate(`/interview/results/${interview.id}`);
+      // Simulate interview completion with mock data
+      // In a real implementation, this would save to backend
+      const mockInterviewId = Date.now().toString();
+
+      // Add a small delay to show the processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      toast({
+        title: "Results Ready!",
+        description: "Your interview analysis is complete.",
+      });
+
+      navigate(`/interview/result/${mockInterviewId}`);
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: "Failed to complete interview. Please try again.",
       });
     }
   };
@@ -67,7 +137,7 @@ export default function InterviewLive() {
         <GlassCard className="mb-8">
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold mb-8">
-              {interview?.job_title} Interview
+              {jobTitle} Interview
             </h2>
 
             {/* AI Avatar / Wave Animation */}
@@ -81,6 +151,49 @@ export default function InterviewLive() {
               <VoiceWaveAnimation isActive={isSpeaking} />
             </div>
 
+            {/* Progress Indicator */}
+            <div className="mb-6 max-w-md mx-auto">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-muted-foreground">
+                  Question {currentQuestionIndex + 1} of {questions.length}
+                </span>
+                <div className="text-right">
+                  <div className="text-sm text-muted-foreground">
+                    {Math.round(((currentQuestionIndex + 1) / questions.length) * 100)}%
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')} elapsed
+                  </div>
+                </div>
+              </div>
+              <Progress
+                value={((currentQuestionIndex + 1) / questions.length) * 100}
+                className="h-2"
+              />
+            </div>
+
+            {/* Question Navigation */}
+            <div className="flex justify-center gap-2 mb-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPreviousQuestion}
+                disabled={currentQuestionIndex === 0}
+                aria-label={`Go to previous question (${currentQuestionIndex} of ${questions.length})`}
+              >
+                ← Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextQuestion}
+                disabled={currentQuestionIndex === questions.length - 1}
+                aria-label={`Go to next question (${currentQuestionIndex + 2} of ${questions.length})`}
+              >
+                Next →
+              </Button>
+            </div>
+
             {/* Current Question */}
             <div className="mb-8">
               <GlassCard className="max-w-2xl mx-auto">
@@ -90,22 +203,41 @@ export default function InterviewLive() {
             </div>
 
             {/* Microphone Button */}
-            <div className="flex justify-center gap-4 mb-8">
-              <Button
-                size="lg"
-                onClick={toggleRecording}
-                className={`rounded-full w-20 h-20 ${
-                  isRecording
-                    ? "bg-destructive hover:bg-destructive/90"
-                    : "bg-linear-to-r from-accent to-primary hover:from-accent/90 hover:to-primary/90"
-                }`}
+            <div className="flex flex-col items-center gap-4 mb-8">
+              <div className="flex justify-center gap-4">
+                <Button
+                  size="lg"
+                  onClick={toggleRecording}
+                  aria-label={isRecording ? "Stop recording" : "Start voice recording (coming soon)"}
+                  className={`rounded-full w-20 h-20 ${
+                    isRecording
+                      ? "bg-destructive hover:bg-destructive/90"
+                      : "bg-linear-to-r from-accent to-primary hover:from-accent/90 hover:to-primary/90"
+                  }`}
+                >
+                  {isRecording ? (
+                    <MicOff className="h-8 w-8" />
+                  ) : (
+                    <Mic className="h-8 w-8" />
+                  )}
+                </Button>
+              </div>
+
+              {/* Simulate Answer Button */}
+              <GradientButton
+                gradient="secondary"
+                onClick={() => {
+                  toast({
+                    title: "Answer Simulated",
+                    description: "Your response has been recorded for demo purposes. AI analysis coming soon!",
+                    duration: 3000,
+                  });
+                }}
+                aria-label="Simulate answering the current question"
+                className="px-6"
               >
-                {isRecording ? (
-                  <MicOff className="h-8 w-8" />
-                ) : (
-                  <Mic className="h-8 w-8" />
-                )}
-              </Button>
+                Simulate Answer
+              </GradientButton>
             </div>
 
             <p className="text-sm text-muted-foreground mb-4">

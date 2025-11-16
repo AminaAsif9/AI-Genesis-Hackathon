@@ -9,24 +9,36 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import { useToast } from "~/hooks/use-toast";
+import { ThemeToggle } from "~/components/ThemeToggle";
 
 export function Navbar() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const getUser = () => {
       const storedUser = localStorage.getItem('user');
       
-      if (!storedUser) {
-        throw new Error("No account found. Please sign up first.");
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
       }
-      setUser(storedUser);
+      // Don't throw error if no user found - authentication is optional
     }
     getUser();
   }, []);
 
   const handleSignOut = async () => {
+    // Clear authentication state
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+
+    toast({
+      title: "Signed Out",
+      description: "You have been successfully signed out.",
+    });
+
     navigate("/");
   };
 
@@ -36,11 +48,12 @@ export function Navbar() {
         <Link to="/" className="flex items-center gap-2 text-2xl font-bold">
           <Mic className="h-6 w-6 text-accent" />
           <span className="bg-linear-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-            VoiceMock
+            InterviewMind
           </span>
         </Link>
 
         <div className="flex items-center gap-4">
+          <ThemeToggle />
           {user ? (
             <>
               <Button variant="ghost" asChild>

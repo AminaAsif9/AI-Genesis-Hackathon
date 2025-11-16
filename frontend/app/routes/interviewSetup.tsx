@@ -10,10 +10,12 @@ import { Label } from "~/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { useInterviewStore } from "~/store/useInterviewStore";
 import { useToast } from "~/hooks/use-toast";
-import { Briefcase } from "lucide-react";
+import { Briefcase, Loader2 } from "lucide-react";
+import { apiClient } from "~/lib/api";
 
 export default function InterviewSetup() {
   const [user, setUser] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -22,17 +24,19 @@ export default function InterviewSetup() {
     jobDescription,
     seniorityLevel,
     difficultyLevel,
+    resumeId,
     setJobTitle,
     setJobDescription,
     setSeniorityLevel,
     setDifficultyLevel,
+    setQuestions,
   } = useInterviewStore();
 
   useEffect(() => {
     const checkAuth = async () => {
       const session = true;
       if (!session) {
-        navigate("/auth");
+        navigate("/auth/login");
         return;
       }
     };
@@ -48,24 +52,39 @@ export default function InterviewSetup() {
       return;
     }
 
-    if (!user) return;
+    if (!resumeId) {
+      toast({
+        title: "Resume required",
+        description: "Please upload your resume first",
+      });
+      navigate("/resume");
+      return;
+    }
 
     try {
-      // Create interview record
-     
+      setIsGenerating(true);
+      toast({
+        title: "Generating questions...",
+        description: "AI is creating personalized interview questions based on your resume",
+      });
+
+      const response = await apiClient.generateQuestions(resumeId, jobTitle, 5);
+      setQuestions(response.questions);
 
       toast({
         title: "Interview starting!",
-        description: "Preparing your interview session...",
+        description: "Questions generated successfully. Starting your interview session...",
       });
 
-      // Navigate to live interview with the interview ID
-      navigate(`/interview/live/12h12`);
+      // Navigate to live interview
+      navigate(`/interview/live/${Date.now()}`);
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
       });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -146,9 +165,20 @@ export default function InterviewSetup() {
                   gradient="accent"
                   size="lg"
                   onClick={handleStartInterview}
+                  disabled={isGenerating}
                   className="w-full"
                 >
-                  Start Voice Interview
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating Questions...
+                    </>
+                  ) : (
+                    <>
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      Start Voice Interview
+                    </>
+                  )}
                 </GradientButton>
               </div>
             </div>
