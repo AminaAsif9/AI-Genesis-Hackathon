@@ -6,6 +6,8 @@ import { GlassCard } from "~/components/GlassCard";
 import { GradientButton } from "~/components/GradientButton";
 import { Upload, PlayCircle, History, TrendingUp } from "lucide-react";
 import { Skeleton } from "~/components/ui/skeleton";
+import { apiClient } from "~/lib/api";
+import { useToast } from "~/hooks/use-toast";
 
 interface User {
   name: string;
@@ -15,10 +17,11 @@ interface User {
 }
 
 interface Interview {
-  id: string;
+  interview_id: string;
   job_title: string;
-  created_at: string;
-  status: string;
+  completed_at: string;
+  overall_score: number;
+  scores: any;
 }
 
 const Dashboard = () => {
@@ -26,13 +29,11 @@ const Dashboard = () => {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkAuth = async () => {
       setLoading(true);
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
 
       const storedUser = localStorage.getItem('user');
 
@@ -40,17 +41,14 @@ const Dashboard = () => {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
         
-        // Mock interview data - single demo entry
-        const mockInterviews: Interview[] = [
-          {
-            id: '1',
-            job_title: 'Senior Software Engineer [Demo Result]',
-            created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-            status: 'Completed'
-          }
-        ];
-        
-        setInterviews(mockInterviews);
+        // Load real interview history
+        try {
+          const historyResponse = await apiClient.getInterviewHistory();
+          setInterviews(historyResponse.interviews);
+        } catch (error: any) {
+          console.error("Failed to load interview history:", error);
+          // Continue with empty interviews array
+        }
       } else {
         navigate('/auth/login');
       }
@@ -155,27 +153,29 @@ const Dashboard = () => {
           <div className="mb-12" data-history-section>
             <div className="flex items-center gap-4 mb-6">
               <h2 className="text-3xl font-bold">Recent Interviews</h2>
-              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-                Demo Data
-              </span>
+              {interviews.length === 0 && (
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  No interviews yet
+                </span>
+              )}
             </div>
             {interviews.length > 0 ? (
               <div className="space-y-4">
                 {interviews.map((interview) => (
-                  <GlassCard key={interview.id} hover>
+                  <GlassCard key={interview.interview_id} hover>
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-xl font-semibold mb-1">
                           {interview.job_title}
                         </h3>
                         <p className="text-muted-foreground text-sm">
-                          {new Date(interview.created_at).toLocaleDateString()} •{" "}
-                          {interview.status}
+                          {new Date(interview.completed_at).toLocaleDateString()} •{" "}
+                          Score: {interview.overall_score}/10
                         </p>
                       </div>
                       <GradientButton
                         gradient="primary"
-                        onClick={() => navigate(`/interview/result/${interview.id}`)}
+                        onClick={() => navigate(`/interview/result/${interview.interview_id}`)}
                       >
                         View Results
                       </GradientButton>
@@ -187,9 +187,13 @@ const Dashboard = () => {
               <GlassCard>
                 <div className="text-center py-12">
                   <History className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-xl text-muted-foreground">
-                    No interviews yet. Start your first practice session!
+                  <h3 className="text-xl font-semibold mb-2">No Interviews Yet</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Complete your first interview to see your results here.
                   </p>
+                  <GradientButton gradient="accent" onClick={() => navigate("/interview/setup")}>
+                    Start Your First Interview
+                  </GradientButton>
                 </div>
               </GlassCard>
             )}

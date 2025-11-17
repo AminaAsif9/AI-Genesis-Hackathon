@@ -1,7 +1,7 @@
 import os
 import re
 import uuid
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from PyPDF2 import PdfReader
 from openai import OpenAI
@@ -13,19 +13,17 @@ import jwt
 import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import base64
+import json
 
 app = Flask(__name__)
 CORS(app)
 
-# client = OpenAI(
-#     base_url="https://api.aimlapi.com/v1",
-#     api_key=os.getenv("AIMLAPI_KEY", "3e309ea84e14470eb327d65938b15097"),
-# )
 client = Groq(api_key=os.getenv("GROQ_API_KEY", "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"))
 
 qdrant_client = QdrantClient(
-    url="https://6b509411-8035-45bf-aaed-40616d6feb3e.eu-west-2-0.aws.cloud.qdrant.io:6333", 
-    api_key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.ahAee0KrwlUEsc_Igi8fNuQD5lds6-UYwZqi4C2-PLM",
+    url=os.getenv("QDRANT_URL", "https://6b509411-8035-45bf-aaed-40616d6feb3e.eu-west-2-0.aws.cloud.qdrant.io:6333"), 
+    api_key=os.getenv("QDRANT_API_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.ahAee0KrwlUEsc_Igi8fNuQD5lds6-UYwZqi4C2-PLM"),
 )
 
 COLLECTION_NAME = "resumes"
@@ -34,6 +32,10 @@ VECTOR_SIZE = 384
 # Authentication configuration
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
 users_db = {}  # In production, use a proper database
+
+# Import AI service and storage
+from ai_service import ai_service
+from storage import interview_storage
 
 # JWT token required decorator
 def token_required(f):
@@ -183,14 +185,12 @@ def initialize_qdrant():
                 collection_name=COLLECTION_NAME,
                 vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE),
             )
-            print(f"Created collection: {COLLECTION_NAME}")
 
         qdrant_client.create_payload_index(
             collection_name=COLLECTION_NAME,
             field_name="name",
             field_schema="keyword"
         )
-        print("Created payload index for 'name'")
 
     except Exception as e:
         print(f"Error initializing Qdrant: {e}")
@@ -349,6 +349,255 @@ Format your response as a numbered list of questions only.
 def health_check():
     return jsonify({"status": "healthy", "message": "API is running"}), 200
 
+# Interview API endpoints
+@app.route('/api/interview/start', methods=['POST'])
+@token_required
+def start_interview(current_user):
+    """Start a new interview session"""
+    try:
+        data = request.get_json()
+        if not data or not data.get('job_title'):
+            return jsonify({"error": "Job title is required"}), 400
+
+        session_id = str(uuid.uuid4())
+        session_data = {
+            'session_id': session_id,
+            'user_id': current_user['id'],
+            'job_title': data['job_title'],
+            'questions': data.get('questions', []),
+            'current_question_index': 0,
+            'answers': [],
+            'started_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'status': 'active'
+        }
+
+        success = interview_storage.save_interview_session(current_user['id'], session_data)
+        if not success:
+            return jsonify({"error": "Failed to create interview session"}), 500
+
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "message": "Interview session started"
+        }), 201
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/interview/<session_id>/answer', methods=['POST'])
+@token_required
+def submit_answer(current_user, session_id):
+    """Submit an answer for the current question"""
+    try:
+        data = request.get_json()
+        if not data or not data.get('answer'):
+            return jsonify({"error": "Answer is required"}), 400
+
+        # Get current session
+        session = interview_storage.get_interview_session(current_user['id'], session_id)
+        if not session:
+            return jsonify({"error": "Interview session not found"}), 404
+
+        # Add answer to session
+        answer_data = {
+            'question': session['questions'][session['current_question_index']],
+            'answer': data['answer'],
+            'question_index': session['current_question_index'],
+            'submitted_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }
+
+        session['answers'].append(answer_data)
+        session['current_question_index'] += 1
+
+        # Check if interview is complete
+        if session['current_question_index'] >= len(session['questions']):
+            session['status'] = 'completed'
+            session['completed_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        success = interview_storage.save_interview_session(current_user['id'], session)
+        if not success:
+            return jsonify({"error": "Failed to save answer"}), 500
+
+        response = {
+            "success": True,
+            "question_index": session['current_question_index'] - 1,
+            "is_complete": session['status'] == 'completed'
+        }
+
+        if session['status'] == 'completed':
+            response["message"] = "Interview completed"
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/interview/<session_id>/status', methods=['GET'])
+@token_required
+def get_interview_status(current_user, session_id):
+    """Get current interview session status"""
+    try:
+        session = interview_storage.get_interview_session(current_user['id'], session_id)
+        if not session:
+            return jsonify({"error": "Interview session not found"}), 404
+
+        return jsonify({
+            "session_id": session_id,
+            "current_question_index": session['current_question_index'],
+            "total_questions": len(session['questions']),
+            "status": session['status'],
+            "is_complete": session['status'] == 'completed'
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/interview/<session_id>/analyze', methods=['POST'])
+@token_required
+def analyze_interview(current_user, session_id):
+    """Analyze completed interview and generate results"""
+    try:
+        session = interview_storage.get_interview_session(current_user['id'], session_id)
+        if not session or session['status'] != 'completed':
+            return jsonify({"error": "Interview session not found or not completed"}), 404
+
+        # Prepare data for AI analysis
+        questions_answers = []
+        for answer in session['answers']:
+            questions_answers.append({
+                'question': answer['question'],
+                'answer': answer['answer']
+            })
+
+        # Get AI evaluation
+        evaluation = ai_service.evaluate_interview(questions_answers, session['job_title'])
+        if not evaluation:
+            # Use fallback evaluation if AI fails
+            evaluation = {
+                "overall": 7,
+                "content": 7,
+                "delivery": 7,
+                "technical": 7,
+                "communication": 7,
+                "feedback": [
+                    "Interview completed successfully",
+                    "AI analysis temporarily unavailable due to high demand",
+                    "Please try again later for detailed feedback"
+                ]
+            }
+
+        # Save results
+        interview_data = {
+            'interview_id': session_id,
+            'user_id': current_user['id'],
+            'job_title': session['job_title'],
+            'questions_answers': questions_answers,
+            'scores': {
+                'overall': evaluation.get('overall', 7),
+                'content': evaluation.get('content', 7),
+                'delivery': evaluation.get('delivery', 7),
+                'technical': evaluation.get('technical', 7),
+                'communication': evaluation.get('communication', 7)
+            },
+            'feedback': evaluation.get('feedback', []),
+            'completed_at': session['completed_at']
+        }
+
+        success = interview_storage.save_interview_result(current_user['id'], interview_data)
+        if not success:
+            return jsonify({"error": "Failed to save interview results"}), 500
+
+        return jsonify({
+            "success": True,
+            "interview_id": session_id,
+            "scores": interview_data['scores'],
+            "feedback": interview_data['feedback']
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/interview/history', methods=['GET'])
+@token_required
+def get_interview_history(current_user):
+    """Get user's interview history"""
+    try:
+        interviews = interview_storage.list_user_interviews(current_user['id'])
+
+        # Format for frontend
+        history = []
+        for interview in interviews:
+            history.append({
+                'interview_id': interview['interview_id'],
+                'job_title': interview['job_title'],
+                'completed_at': interview['completed_at'],
+                'overall_score': interview['scores']['overall'],
+                'scores': interview['scores']
+            })
+
+        return jsonify({
+            "success": True,
+            "interviews": history
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/interview/<interview_id>/results', methods=['GET'])
+@token_required
+def get_interview_results(current_user, interview_id):
+    """Get detailed results for a specific interview"""
+    try:
+        interview = interview_storage.get_interview_result(current_user['id'], interview_id)
+        if not interview:
+            return jsonify({"error": "Interview not found"}), 404
+
+        return jsonify({
+            "success": True,
+            "interview": {
+                'interview_id': interview['interview_id'],
+                'job_title': interview['job_title'],
+                'completed_at': interview['completed_at'],
+                'questions_answers': interview['questions_answers'],
+                'scores': interview['scores'],
+                'feedback': interview['feedback']
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# STT/TTS endpoints
+@app.route('/api/stt/process', methods=['POST'])
+@token_required
+def process_speech_to_text(current_user):
+    """Process audio file to text"""
+    try:
+        data = request.get_json()
+        if not data or not data.get('audio_data'):
+            return jsonify({"error": "Audio data is required"}), 400
+
+        # Decode base64 audio data
+        audio_b64 = data['audio_data']
+        if audio_b64.startswith('data:audio/'):
+            # Remove data URL prefix if present
+            audio_b64 = audio_b64.split(',')[1]
+
+        audio_data = base64.b64decode(audio_b64)
+
+        # Process with AI service
+        transcription = ai_service.transcribe_audio(audio_data)
+        if transcription is None:
+            return jsonify({"error": "Speech recognition failed"}), 500
+
+        return jsonify({
+            "success": True,
+            "transcription": transcription
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/upload-resume', methods=['POST'])
 def upload_resume():
     try:
@@ -424,6 +673,43 @@ def generate_questions():
             "total_questions": len(questions)
         }), 200
         
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# STT/TTS API endpoints
+@app.route('/api/stt/process', methods=['POST'])
+@token_required
+def process_speech(current_user):
+    """Process speech audio and return transcription"""
+    try:
+        data = request.get_json()
+        if not data or not data.get('audio_data'):
+            return jsonify({"error": "Audio data is required"}), 400
+
+        # Extract base64 audio data
+        audio_data_str = data['audio_data']
+        if ',' in audio_data_str:
+            # Handle data URL format: "data:audio/webm;base64,<base64data>"
+            audio_b64 = audio_data_str.split(',')[1]
+        else:
+            audio_b64 = audio_data_str
+
+        # Decode base64 to bytes
+        try:
+            audio_bytes = base64.b64decode(audio_b64)
+        except Exception as e:
+            return jsonify({"error": f"Invalid base64 audio data: {str(e)}"}), 400
+
+        # Transcribe audio
+        transcription = ai_service.transcribe_audio(audio_bytes)
+        if transcription is None:
+            return jsonify({"error": "Speech recognition failed"}), 500
+
+        return jsonify({
+            "success": True,
+            "transcription": transcription
+        }), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

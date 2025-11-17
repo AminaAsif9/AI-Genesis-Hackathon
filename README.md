@@ -1,38 +1,39 @@
-# InterviewMind - AI-Powered Interview Preparation Platform
+# InterviewMind - AI Interview Practice Platform
 
-An AI-powered interview preparation platform built for the AI-Genesis Hackathon. Practice job-specific interviews with personalized AI-generated questions, receive detailed feedback, and improve your interview skills through voice-enabled mock sessions.
+An AI-powered interview practice platform built for the AI-Genesis Hackathon. Practice interviews with AI-generated questions, voice recording, and basic feedback.
 
 ## 🚀 Features
 
-- **Resume Upload & AI Analysis**: Upload your resume (PDF/TXT) and get personalized interview questions
-- **AI-Generated Questions**: Questions tailored to your experience level and job role using Groq AI
-- **JWT Authentication**: Secure user authentication with registration and login
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
-- **Modern UI**: Glass-morphism design with dark/light theme support
-
-### 🚧 In Development
-- Voice-enabled practice sessions
-- Real-time feedback and analysis
-- Progress tracking and history
+- **Resume Upload**: Upload your resume (PDF/TXT) for question generation
+- **AI-Generated Questions**: Questions based on your resume and job role using Gemini AI
+- **Voice Recording**: Record answers using browser speech recognition
+- **Text-to-Speech**: Listen to questions using browser TTS
+- **Basic Evaluation**: Get feedback on your answers
+- **User Authentication**: JWT-based registration and login
+- **Responsive Design**: Works on desktop and mobile devices
+- **Modern UI**: Clean interface with theme support
+- **Session Tracking**: View past interview sessions
 
 ## 🛠️ Technology Stack
 
 ### Backend
 - **Python Flask** - REST API server
-- **Groq AI** - Question generation and AI processing
-- **Qdrant Vector Database** - Resume storage and semantic search
-- **JWT Authentication** - Secure token-based auth
-- **PyPDF2** - PDF text extraction
+- **Google Gemini AI** - Question generation and basic evaluation
+- **Groq AI** - AI processing
+- **Qdrant Vector Database** - Resume storage
+- **JWT Authentication** - User authentication
+- **PyPDF2** - PDF processing
+- **Web Speech API** - Browser text-to-speech
 
 ### Frontend
-- **React 19** - Modern React with hooks
-- **TypeScript** - Type-safe development
-- **Vite** - Fast build tool and dev server
-- **React Router 7** - Client-side routing
-- **TailwindCSS** - Utility-first styling
-- **Zustand** - Lightweight state management
-- **Radix UI** - Accessible component primitives
-- **Sonner** - Toast notifications
+- **React 19** - React framework
+- **TypeScript** - Type safety
+- **Vite** - Build tool
+- **React Router 7** - Routing
+- **TailwindCSS** - Styling
+- **Zustand** - State management
+- **Radix UI** - UI components
+- **React Speech Recognition** - Voice input
 
 ## 📋 Prerequisites
 
@@ -40,6 +41,7 @@ An AI-powered interview preparation platform built for the AI-Genesis Hackathon.
 - Python 3.11+ (recommended)
 - Node.js 18+
 - Git
+- Modern web browser with Web Speech API support (Chrome, Edge, Safari)
 
 ### For Docker Development (Optional)
 - Docker
@@ -70,10 +72,17 @@ An AI-powered interview preparation platform built for the AI-Genesis Hackathon.
 4. **Set up environment variables**
    Create a `.env` file in the root directory:
    ```env
-   GROQ_API_KEY=your_groq_api_key
-   QDRANT_URL=your_qdrant_cloud_url
-   QDRANT_API_KEY=your_qdrant_api_key
-   JWT_SECRET_KEY=your_jwt_secret_key
+   # REQUIRED AI Service API Keys
+   GEMINI_API_KEY=your_gemini_api_key_here
+   GROQ_API_KEY=your_groq_api_key_here
+
+   # Qdrant Configuration
+   QDRANT_URL=https://your-qdrant-instance.com:6333
+   QDRANT_API_KEY=your_qdrant_api_key_here
+
+   # Flask Configuration
+   JWT_SECRET_KEY=your_secure_jwt_secret_key_here
+   FLASK_ENV=development
    ```
 
 5. **Run the backend**
@@ -105,13 +114,7 @@ An AI-powered interview preparation platform built for the AI-Genesis Hackathon.
 1. **Ensure Docker and Docker Compose are installed**
 
 2. **Set up environment variables**
-   Create a `.env` file in the root directory:
-   ```env
-   GROQ_API_KEY=your_groq_api_key
-   QDRANT_URL=your_qdrant_cloud_url
-   QDRANT_API_KEY=your_qdrant_api_key
-   JWT_SECRET_KEY=your_jwt_secret_key
-   ```
+   Create a `.env` file in the root directory (same as above)
 
 3. **Run with Docker Compose**
    ```bash
@@ -123,24 +126,29 @@ An AI-powered interview preparation platform built for the AI-Genesis Hackathon.
 ## 📁 Project Structure
 
 ```
-├── app.py                 # Flask backend server
-├── requirements.txt       # Python dependencies
-├── Dockerfile             # Backend container configuration
-├── docker-compose.yml     # Full-stack container orchestration
+├── app.py                # Flask backend server
+├── ai_service.py         # AI processing and API integrations
+├── storage.py            # User data and interview storage
+├── requirements.txt      # Python dependencies
+├── Dockerfile            # Backend container configuration
+├── docker-compose.yml    # Full-stack container orchestration
+├── .env.example          # Environment variables template
 ├── frontend/             # React frontend
 │   ├── app/              # React Router v7 app directory
 │   │   ├── components/   # Reusable UI components
+│   │   │   ├── ui/       # Radix UI components
+│   │   │   └── *.tsx     # Custom components
 │   │   ├── routes/       # Page components
 │   │   ├── store/        # Zustand state management
 │   │   ├── hooks/        # Custom React hooks
 │   │   ├── lib/          # Utilities and API client
 │   │   └── root.tsx      # App root component
+│   ├── public/           # Static assets
+│   ├── build/            # Production build output
 │   ├── Dockerfile        # Frontend container configuration
 │   └── package.json
 ├── qdrant_data/          # Local Qdrant data (if using local instance)
-├── currentstate.md       # Project status and architecture details
-├── DEVELOPMENT.md        # Development guidelines and testing
-├── frontend-backend-analysis.md # Technical analysis and documentation
+├── user_data/            # User interview data storage
 └── LICENSE               # MIT license
 ```
 
@@ -162,10 +170,18 @@ An AI-powered interview preparation platform built for the AI-Genesis Hackathon.
   - **Form Data**: `name` (string), `resume` (file - PDF/TXT)
   - **Response**: `{ "success": true, "name": "string", "chunks_stored": number }`
 
-### Interview Questions
+### Interview Management
 - `POST /api/generate-questions` - Generate interview questions
   - **Body**: `{ "name": "string", "job_title": "string", "num_questions": number }`
   - **Response**: `{ "success": true, "questions": [...], "total_questions": number }`
+- `POST /api/start-interview` - Start a new interview session
+  - **Body**: `{ "name": "string", "job_title": "string", "questions": [...] }`
+  - **Response**: `{ "session_id": "string", "message": "string" }`
+- `POST /api/submit-answer` - Submit answer for evaluation
+  - **Body**: `{ "session_id": "string", "question_index": number, "answer": "string" }`
+  - **Response**: `{ "evaluation": {...}, "next_question": {...} }`
+- `GET /api/interview-result/:session_id` - Get interview results
+  - **Response**: `{ "results": {...}, "evaluation": {...} }`
 
 ### Health Check
 - `GET /health` - API health check
@@ -174,14 +190,45 @@ An AI-powered interview preparation platform built for the AI-Genesis Hackathon.
 ## 🎯 Usage
 
 1. **Register/Login**: Create an account or sign in
-2. **Upload Resume**: Upload your resume to get personalized questions
-3. **Generate Questions**: Get AI-generated interview questions based on your resume and target job role
-4. **Practice**: Go through the generated interview questions (voice features coming soon)
+2. **Upload Resume**: Upload your resume (PDF or TXT) for question generation
+3. **Setup Interview**: Select job role and number of questions
+4. **Practice Interview**:
+   - Listen to questions using text-to-speech
+   - Record answers using voice or type manually
+   - Navigate through questions
+5. **View Results**: See basic evaluation feedback
 
-### 🚧 Future Features
-- Interactive voice-based practice sessions
-- Real-time feedback and performance analysis
-- Progress tracking and improvement suggestions
+## 🔒 Security & Configuration
+
+### Environment Variables
+All sensitive configuration is managed through environment variables. Copy `.env.example` to `.env` and fill in your API keys:
+
+- **AI Services**: `GEMINI_API_KEY`, `GROQ_API_KEY`
+- **Database**: `QDRANT_URL`, `QDRANT_API_KEY`
+- **Security**: `JWT_SECRET_KEY`
+
+### Production Deployment
+- Never commit `.env` files to version control
+- Use strong, unique secrets for JWT tokens
+- Configure proper CORS settings for production domains
+- Enable HTTPS in production environments
+
+## 🧪 Testing & Development
+
+### Running Tests
+```bash
+# Backend tests (if implemented)
+python -m pytest
+
+# Frontend build verification
+cd frontend && npm run build
+```
+
+### Development Guidelines
+- Follow standard React and Python best practices
+- Use TypeScript for type safety
+- Handle errors appropriately
+- Test manually before deployment
 
 ## 📄 License
 
@@ -190,6 +237,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Built for the AI-Genesis Hackathon
-- Powered by Groq AI for question generation
-- Qdrant for vector database functionality
-- React and Flask communities for excellent documentation
+- Uses Google Gemini AI for question generation
+- Uses Groq AI for processing
+- Uses Qdrant for vector database
+- React and Flask for the framework
+- Web Speech API for voice features

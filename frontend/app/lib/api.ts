@@ -16,6 +16,71 @@ export interface GenerateQuestionsResponse {
   total_questions: number;
 }
 
+export interface StartInterviewResponse {
+  success: boolean;
+  session_id: string;
+  message: string;
+}
+
+export interface SubmitAnswerResponse {
+  success: boolean;
+  question_index: number;
+  is_complete: boolean;
+  message?: string;
+}
+
+export interface InterviewStatusResponse {
+  session_id: string;
+  current_question_index: number;
+  total_questions: number;
+  status: string;
+  is_complete: boolean;
+}
+
+export interface AnalyzeInterviewResponse {
+  success: boolean;
+  interview_id: string;
+  scores: {
+    overall: number;
+    content: number;
+    delivery: number;
+    technical: number;
+    communication: number;
+  };
+  feedback: string[];
+}
+
+export interface InterviewHistoryResponse {
+  success: boolean;
+  interviews: Array<{
+    interview_id: string;
+    job_title: string;
+    completed_at: string;
+    overall_score: number;
+    scores: any;
+  }>;
+}
+
+export interface InterviewResultsResponse {
+  success: boolean;
+  interview: {
+    interview_id: string;
+    job_title: string;
+    completed_at: string;
+    questions_answers: Array<{
+      question: string;
+      answer: string;
+    }>;
+    scores: any;
+    feedback: string[];
+  };
+}
+
+export interface STTResponse {
+  success: boolean;
+  transcription: string;
+}
+
 export interface HealthResponse {
   status: string;
   message: string;
@@ -109,6 +174,54 @@ class ApiClient {
         name,
         job_title: jobTitle,
         num_questions: numQuestions,
+      }),
+    });
+  }
+
+  // Interview methods
+  async startInterview(jobTitle: string, questions: string[]): Promise<StartInterviewResponse> {
+    return this.request<StartInterviewResponse>('/api/interview/start', {
+      method: 'POST',
+      body: JSON.stringify({
+        job_title: jobTitle,
+        questions: questions,
+      }),
+    });
+  }
+
+  async submitAnswer(sessionId: string, answer: string): Promise<SubmitAnswerResponse> {
+    return this.request<SubmitAnswerResponse>(`/api/interview/${sessionId}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({
+        answer: answer,
+      }),
+    });
+  }
+
+  async getInterviewStatus(sessionId: string): Promise<InterviewStatusResponse> {
+    return this.request<InterviewStatusResponse>(`/api/interview/${sessionId}/status`);
+  }
+
+  async analyzeInterview(sessionId: string): Promise<AnalyzeInterviewResponse> {
+    return this.request<AnalyzeInterviewResponse>(`/api/interview/${sessionId}/analyze`, {
+      method: 'POST',
+    });
+  }
+
+  async getInterviewHistory(): Promise<InterviewHistoryResponse> {
+    return this.request<InterviewHistoryResponse>('/api/interview/history');
+  }
+
+  async getInterviewResults(interviewId: string): Promise<InterviewResultsResponse> {
+    return this.request<InterviewResultsResponse>(`/api/interview/${interviewId}/results`);
+  }
+
+  // STT/TTS methods
+  async processSpeech(audioData: string): Promise<STTResponse> {
+    return this.request<STTResponse>('/api/stt/process', {
+      method: 'POST',
+      body: JSON.stringify({
+        audio_data: audioData,
       }),
     });
   }
