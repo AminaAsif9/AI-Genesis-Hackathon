@@ -7,3 +7,6 @@ groq
 PyJWT
 Werkzeug
 requests
+requests
+python-dotenv
+
