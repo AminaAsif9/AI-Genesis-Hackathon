@@ -6,3 +6,4 @@ qdrant-client
 groq
 PyJWT
 Werkzeug
+requests
