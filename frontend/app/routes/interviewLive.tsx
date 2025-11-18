@@ -339,89 +339,92 @@ export default function InterviewLive() {
     }
   };
 
-  const toggleRecording = async () => {
-    if (!browserSupportsSpeechRecognition) {
-      toast({
-        title: "Speech Recognition Not Supported",
-        description: "Your browser doesn't support speech recognition. Try Chrome, Edge, or Safari. Use text input instead.",
-      });
-      setShowManualInput(true);
-      return;
-    }
+ const toggleRecording = async () => {
+  if (!browserSupportsSpeechRecognition) {
+    toast({
+      title: "Not Supported",
+      description: "Speech recognition not supported. Use text input.",
+    });
+    setShowManualInput(true);
+    return;
+  }
 
-    if (listening) {
-      // Stop listening and submit if we have transcript
-      SpeechRecognition.stopListening();
-      stopVolumeMonitoring();
-      
-      // Clear any existing timeout
-      if (recordingTimeout) {
-        clearTimeout(recordingTimeout);
-        setRecordingTimeout(null);
-      }
-      setTimeLeft(30); // Reset timer
-      
-      if (transcript.trim()) {
-        toast({
-          title: "Speech detected!",
-          description: `"${transcript.trim()}" - Submitting answer...`,
-        });
-        submitVoiceAnswer(transcript.trim());
-      } else {
-        toast({
-          title: "No speech detected",
-          description: "Please try again or use text input.",
-        });
-        setShowManualInput(true);
-      }
+  if (listening) {
+    // === STOP RECORDING ===
+    SpeechRecognition.stopListening();
+    stopVolumeMonitoring();
+
+    if (recordingTimeout) {
+      clearTimeout(recordingTimeout);
+      setRecordingTimeout(null);
+    }
+    setTimeLeft(30);
+
+    const finalTranscript = transcript.trim();
+    if (finalTranscript) {
+      await submitVoiceAnswer(finalTranscript);
     } else {
-      // Start listening
+      toast({ title: "No speech detected", description: "Try again or type your answer." });
+      setShowManualInput(true);
+    }
+    resetTranscript();
+  } else {
+    // === START RECORDING ===
+    try {
       resetTranscript();
-      setTimeLeft(30); // Reset timer display
+      setTimeLeft(30);
+
+      // Start volume monitoring FIRST (this triggers mic permission)
       await startVolumeMonitoring();
-      SpeechRecognition.startListening({
-        continuous: true,  // Keep listening even after speech ends
+
+      // Then start speech recognition
+      await SpeechRecognition.startListening({
+        continuous: true,
         language: 'en-US'
       });
 
-      // Start countdown timer
+      // Now set up 30-second auto-stop
       const timeout = setTimeout(() => {
         if (listening) {
           SpeechRecognition.stopListening();
           stopVolumeMonitoring();
           setRecordingTimeout(null);
-          setTimeLeft(30); // Reset for next time
-          
-          if (transcript.trim()) {
-            toast({
-              title: "Auto-submitted",
-              description: `"${transcript.trim()}" - Answer submitted after 30 seconds`,
-            });
-            submitVoiceAnswer(transcript.trim());
+
+          const final = transcript.trim();
+          if (final) {
+            toast({ title: "Time's up!", description: "Auto-submitting your answer..." });
+            submitVoiceAnswer(final);
           } else {
-            toast({
-              title: "Timeout - No speech detected",
-              description: "Please try again or use text input.",
-            });
+            toast({ title: "No speech detected", description: "Please try again." });
             setShowManualInput(true);
           }
         }
-      }, 30000); // 30 seconds timeout
-      
+      }, 30000);
+
       setRecordingTimeout(timeout);
 
-      // Update countdown every second
-      const countdownInterval = setInterval(() => {
+      // Countdown UI
+      const interval = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
-            clearInterval(countdownInterval);
+            clearInterval(interval);
             return 30;
           }
           return prev - 1;
         });
       }, 1000);
+
+    } catch (err: any) {
+      console.error("Mic access failed:", err);
+      toast({
+        title: "Microphone Access Denied",
+        description: "Please allow microphone permission and refresh.",
+      });
+      setShowManualInput(true);
+      stopVolumeMonitoring();
     }
-  };
+  }
+};
 
   const submitManualAnswer = async () => {
     if (!manualAnswer.trim() || !sessionId) return;
@@ -512,6 +515,14 @@ export default function InterviewLive() {
       setIsProcessing(false);
     }
   };
+  useEffect(() => {
+  return () => {
+    SpeechRecognition.stopListening();
+    stopVolumeMonitoring();
+    if (recordingTimeout) clearTimeout(recordingTimeout);
+    speechSynthesis.cancel();
+  };
+}, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12">
